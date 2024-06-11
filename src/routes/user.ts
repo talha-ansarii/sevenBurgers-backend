@@ -29,6 +29,9 @@ export const userRouter = new Hono<{
     }
   }>();
 
+
+
+  // Signup
 userRouter.post('/signup',async (c) => {
 
   const prisma = new PrismaClient({
@@ -66,7 +69,7 @@ try {
 })
 
 
-
+// Signin
 userRouter.post('/signin',async (c) => {
 
   const prisma = new PrismaClient({
@@ -102,14 +105,12 @@ try {
 
   }
 
-  // res.setHeader("Set-Cookie", "test=" + "myValue" ).json("sucess")
   const age = 60 * 60 * 24 * 7;
 
   const token = await sign({ id: user.id }, c.env.JWT_SECRET);
   
   setCookie(c, 'token', token , {
     httpOnly : true,
-    // secure : true,
     maxAge : age,
     
 })
@@ -126,7 +127,7 @@ return c.json({message : "Logged in!" , user : userInfo})
 
 });
 
-
+// Signout
 userRouter.post('/signout', async (c) => {
   deleteCookie(c, "token")
   return c.json({message : "signed out successfully"})
