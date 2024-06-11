@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
-import { decode, sign, verify } from 'hono/jwt'
-import { getCookie, getSignedCookie, setCookie, setSignedCookie, deleteCookie } from 'hono/cookie'
+import {   verify } from 'hono/jwt'
+import { getCookie    } from 'hono/cookie'
 
 
 export const blogRouter = new Hono<{
@@ -15,7 +15,7 @@ export const blogRouter = new Hono<{
 
 
 
-
+// Middleware
   blogRouter.use("/*", async (c, next) => {
     const token =  getCookie(c, 'token')
     if (token === "" || !token) {
@@ -39,6 +39,7 @@ export const blogRouter = new Hono<{
   })
   
 
+//   Create Blog
   blogRouter.post('/', async (c) => {
     const body = await c.req.json();
 
@@ -63,6 +64,7 @@ export const blogRouter = new Hono<{
   })
 
 
+//   Update Blog
   blogRouter.put('/', async (c) => {
 
     const body = await c.req.json();
@@ -91,7 +93,7 @@ export const blogRouter = new Hono<{
   })
 
 
-
+// Get all blogs
   blogRouter.get('/bulk', async (c) => {
 
     // console.log("from bulk")
@@ -119,6 +121,8 @@ export const blogRouter = new Hono<{
     
   })
 
+
+//   Get Blog by ID
   blogRouter.get('/:id', async (c) => {
 
     const id = c.req.param("id")
@@ -155,6 +159,44 @@ export const blogRouter = new Hono<{
     
     
   })
+
+  // Delete Blog
+    blogRouter.delete('/:id', async (c) => {
+    
+        const id = c.req.param("id")
+        
+        const prisma = new PrismaClient({
+            datasourceUrl: c.env.DATABASE_URL,
+        }).$extends(withAccelerate())
+    
+        try {
+            const idNumber = Number(id);
+    
+            if (isNaN(idNumber)) {
+            throw new Error("ID must be a number");
+        }
+            const blog = await prisma.post.delete({
+                where: {
+                    id: idNumber,
+                }  
+            })
+    
+            return c.json({
+                success : true,
+                id : blog.id
+            })
+            
+        } catch (error) {
+            c.status(411)
+            return c.json({
+                success : false,
+                message : "error while deleting blog"
+            })
+        }
+        
+        
+    })
+
 
 
 
