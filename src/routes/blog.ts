@@ -3,46 +3,71 @@ import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
 import {   verify } from 'hono/jwt'
 import { getCookie    } from 'hono/cookie'
-
-
+import { createMiddleware } from 'hono/factory'
+import {parse} from 'flatted'
 export const blogRouter = new Hono<{
     Bindings: {
       DATABASE_URL: string
       JWT_SECRET : string
     },
+    Variables : {
+        userId : string
+    }
     
   }>()
 
 
 
 // Middleware
-  blogRouter.use("/*", async (c, next) => {
-    const token =  getCookie(c, 'token')
-    if (token === "" || !token) {
+
+const authMiddleware = createMiddleware( async (c, next) => {
+    console.log("from middleware")
+    const jwt = c.req.header('Authorization') || "";
+
+    console.log(jwt)
+	if (jwt === "" || !jwt) {
 		c.status(401);
 		return c.json({ 
             success: false,
             error: "unauthorized" });
 	}
-    
+	const token = jwt.split(' ')[1];
 
-      const decodedPayload = await verify(token, c.env.JWT_SECRET)
-
-    if (!decodedPayload) {
-        return c.json({ message: "Not Authenticated!" }, 401);
-
-      }
-      await next()
-
+    try {
+        const user = await verify(token , c.env.JWT_SECRET);
+    // console.log(user)
+    if(user){
+        c.set("userId" , user.id)
+        await next();
+    }else{
+        c.status(403)
+        return c.json({
+            success : false,
+            message : "you are not logged in"
+        })  
+    }
+        
+    } catch (error) {
+        c.status(403)
+        return c.json({
+            success : false,
+            message : "you are not logged in"
+        })
+        
+    }
     
 
   })
+
+
   
 
 //   Create Blog
-  blogRouter.post('/', async (c) => {
+  blogRouter.post('/',authMiddleware, async (c) => {
     const body = await c.req.json();
-
+    
+    console.log(body)
+    
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
@@ -53,6 +78,7 @@ export const blogRouter = new Hono<{
             title : body.title,
             content : body.content,
             images : body.images,
+            blogNo : body.blogNo,
 
         }
     })
@@ -65,11 +91,12 @@ export const blogRouter = new Hono<{
 
 
 //   Update Blog
-  blogRouter.put('/', async (c) => {
+  blogRouter.put('/',authMiddleware, async (c) => {
 
     const body = await c.req.json();
 
-  
+    console.log(body)
+
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
@@ -82,6 +109,7 @@ export const blogRouter = new Hono<{
             title : body.title,
             content : body.content,
             images : body.images,
+            createdAt: new Date(),
             
 
         }
@@ -94,32 +122,40 @@ export const blogRouter = new Hono<{
 
 
 // Get all blogs
-  blogRouter.get('/bulk', async (c) => {
-
-    // console.log("from bulk")
+blogRouter.get('/bulk', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
 
+    const page = Number(c.req.query('page') || '1');
+    const pageSize = Number(c.req.query('pageSize') || '10');
+    const skip = (page - 1) * pageSize;
 
     try {
-        const blogs = await prisma.post.findMany()
+        const blogs = await prisma.post.findMany({
+            skip,
+            take: pageSize,
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const totalBlogs = await prisma.post.count();
 
         return c.json({
-            success : true,
-            blogs:blogs
-        })
-        
+            success: true,
+            blogs,
+            totalBlogs,
+            totalPages: Math.ceil(totalBlogs / pageSize),
+            currentPage: page
+        });
+
     } catch (error) {
         c.status(411)
         return c.json({
-            success : false,
-            message : "error while finding blogs"
-        })
+            success: false,
+            message: "error while finding blogs"
+        });
     }
-    
-    
-  })
+});
 
 
 //   Get Blog by ID
@@ -161,7 +197,7 @@ export const blogRouter = new Hono<{
   })
 
   // Delete Blog
-    blogRouter.delete('/:id', async (c) => {
+    blogRouter.delete('/:id',authMiddleware, async (c) => {
     
         const id = c.req.param("id")
         
@@ -191,6 +227,47 @@ export const blogRouter = new Hono<{
             return c.json({
                 success : false,
                 message : "error while deleting blog"
+            })
+        }
+        
+        
+    })
+
+
+    //search blog
+    blogRouter.get('/search/:query', async (c) => {
+        const query = c.req.param("query")
+
+        console.log(query)
+        
+        const prisma = new PrismaClient({
+            datasourceUrl: c.env.DATABASE_URL,
+        }).$extends(withAccelerate())
+    
+        try {
+            const blogs = await prisma.post.findMany({
+                where: {
+                    OR: [
+                        {
+                            title: {
+                                contains: query,
+                                mode: 'insensitive'
+                            }
+                        },    
+                    ]
+                }
+            })
+    
+            return c.json({
+                success : true,
+                blogs
+            })
+            
+        } catch (error) {
+            c.status(411)
+            return c.json({
+                success : false,
+                message : "error while searching blog"
             })
         }
         

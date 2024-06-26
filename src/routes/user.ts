@@ -56,13 +56,12 @@ try {
   });
 
   console.log(newUser);
+  const token = await sign({id: newUser.id }, c.env.JWT_SECRET)
 
-  return c.json({ message: "User created!" }, 201);
+  return c.json({ token : token , message: "User created!" }, 201);
 } catch (err) {
 
-
   console.log(err);
-
   return c.json({ message: "Error creating user!" }, 500);
 }
 
@@ -105,16 +104,15 @@ try {
 
   }
 
+
+
   const age = 60 * 60 * 24 * 7;
 
   const token = await sign({ id: user.id }, c.env.JWT_SECRET);
-  
-  setCookie(c, 'token', token , {
-    httpOnly : true,
-    maxAge : age,
-    
-})
-return c.json({message : "Logged in!" , user : userInfo})
+  console.log(token)
+
+
+return c.json({token : token , message : "Logged in!" , user : userInfo})
 
   
 

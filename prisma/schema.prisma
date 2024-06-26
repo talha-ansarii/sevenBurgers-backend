@@ -24,7 +24,9 @@ model User {
 
 model Post {
   id        Int      @id @default(autoincrement())
+  blogNo    Int      @unique
   title     String
-  content   String
+  content   String[]
   images   String[]
+  createdAt              DateTime            @default(now())
 }
