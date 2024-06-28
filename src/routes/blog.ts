@@ -121,14 +121,43 @@ const authMiddleware = createMiddleware( async (c, next) => {
   })
 
 
-// Get all blogs
+  blogRouter.get('/allblogs', async (c) => {
+    console.log("from all blogs")
+
+
+    const prisma = new PrismaClient({
+        datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate())
+
+
+    try {
+        const blogs = await prisma.post.findMany()
+
+        return c.json({
+            success : true,
+            blogs:blogs
+        })
+        
+    } catch (error) {
+        c.status(411)
+        return c.json({
+            success : false,
+            message : "error while finding blogs"
+        })
+    }
+    
+    
+  })
+
+
+// Get blogs for pagination
 blogRouter.get('/bulk', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
 
     const page = Number(c.req.query('page') || '1');
-    const pageSize = Number(c.req.query('pageSize') || '10');
+    const pageSize = Number(c.req.query('pageSize') || '3');
     const skip = (page - 1) * pageSize;
 
     try {
